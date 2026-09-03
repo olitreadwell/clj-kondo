@@ -24,7 +24,7 @@
 - dev.md asks contributors to open an issue before non-trivial work; trivial doc/link/typo fixes are low-risk and not gated by issue-first in practice.
 
 ## Gap ledger (dedupe — READ FIRST, never re-pick)
-- (none yet for this repo)
+- 2026-09-03: docs trivial cleanup PR opened (fix-docs-typos -> PR #2): 8 fixes in 4 files (README empty link, stale --help version, 3 editor-integration typos, stale NixOS nixpkgs link, linters typo).
 
 ## Mined gaps (discovered, not yet attempted)
 - (see current run)
