@@ -44,7 +44,7 @@ It is fully self-contained - without the overhead that comes with Docker! -->
 ## NixOS
 
 `clj-kondo` is available in the
-[Nix Packages collection](https://github.com/NixOS/nixpkgs/blob/master/pkgs/development/tools/clj-kondo/default.nix).
+[Nix Packages collection](https://github.com/NixOS/nixpkgs/blob/master/pkgs/by-name/cl/clj-kondo/package.nix).
 To install it globally, add it to your `systemPackages`. If you just want to try it, you can do it in a Nix shell:
 
     nix-shell -p clj-kondo
