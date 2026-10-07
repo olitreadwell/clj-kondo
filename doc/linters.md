@@ -1554,7 +1554,7 @@ Read [this](https://github.com/clj-kondo/clj-kondo/issues/1331) issue for more b
 
 *Keyword:* `:not-empty?`
 
-*Description:* warn on `(not (empty? ...))` idiom. According to the docstring of `empty?` `seq` is prefered.
+*Description:* warn on `(not (empty? ...))` idiom. According to the docstring of `empty?` `seq` is preferred.
 
 *Default level:* `:warning`.
 

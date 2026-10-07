@@ -20,7 +20,7 @@ A static analyzer and linter for Clojure code that sparks joy.
 
 ## Rationale
 
-Clj-kondo performs [static analysis]() on Clojure, ClojureScript and EDN. It
+Clj-kondo performs static analysis on Clojure, ClojureScript and EDN. It
 informs you about potential errors while you are typing (without executing your
 program).
 
@@ -157,7 +157,7 @@ $ clj-kondo --lint "$(lein classpath)"
 Help:
 ``` shellsession
 $ clj-kondo --help
-clj-kondo v2024.11.14
+clj-kondo v2026.08.04
 
 Options:
 
@@ -306,7 +306,7 @@ clj-kondo or some other unexpected error beyond the control of clj-kondo.
 
 ## Macros
 
-As clj-kondo is a static analyzer is does not need a runtime (JVM, browser,
+As clj-kondo is a static analyzer it does not need a runtime (JVM, browser,
 Node.js, etc.). It doesn't execute your code. As such it can be a faster
 alternative to linters that do use a runtime, like
 [eastwood](https://github.com/jonase/eastwood). This approach comes with the

@@ -55,10 +55,10 @@ features:
 and more.
 
 This section assumes that you are using the `lsp-mode` emacs package and
-mentions `lsp-`-mode specific settings. If you are usign `eglot`, a different
+mentions `lsp-`-mode specific settings. If you are using `eglot`, a different
 emacs lsp client, those settings don't apply.
 
-As of 26th of March 2023, some of the below recommendations are only availably
+As of 26th of March 2023, some of the below recommendations are only available
 via the clojure-lsp master branch. See the end of this section how to run that
 locally.
 
@@ -130,7 +130,7 @@ clj -Sdeps '{:aliases
                        -M:lsp -m clojure-lsp.main "$@"
 ```
 
-The configure the following in emacs:
+Then configure the following in emacs:
 
 ``` elisp
 (setq lsp-clojure-custom-server-command '("/Users/borkdude/bin/clojure-lsp-dev"))
