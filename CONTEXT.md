@@ -1,5 +1,5 @@
 # clj-kondo/clj-kondo context
-> refreshed 2026-09-03 | upstream default: master @ d92d155029301adc552381aae21faa82569700c8
+> refreshed 2026-10-12 | upstream default: master @ f2f09c8c5de92e0e9c98ad501e60a57abd45c50b
 
 ## Identity & policies
 - upstream: clj-kondo/clj-kondo, default branch `master`, primary language Clojure, English-first yes.
@@ -25,6 +25,7 @@
 
 ## Gap ledger (dedupe — READ FIRST, never re-pick)
 - 2026-09-03: docs trivial cleanup PR opened (fix-docs-typos -> PR #2): 8 fixes in 4 files (README empty link, stale --help version, 3 editor-integration typos, stale NixOS nixpkgs link, linters typo).
+- 2026-10-12: typo cleanup PR opened (fix-docs-and-comment-typos -> PR #5): 15 fixes in 10 files (doc/dev.md predicable, doc/hooks.md correponding, doc/linters.md overriden + ambigious, doc/types.md misplaced example quote, src/clj_kondo/core.clj 3 stray docstring backticks, analyzer.clj postion/extented/exising, experiments/parallelize-analysis.md parallize, 3 test-description typos). Re-verified live @ f2f09c8; no upstream PR touches these strings. Did NOT re-pick PR #2's strings.
 
 ## Mined gaps (discovered, not yet attempted)
 - (see current run)
