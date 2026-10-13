@@ -591,7 +591,7 @@ Docstring missing for task: a
 
 *Description:* warn on the usage of a discouraged Java method
 
-*Default level:* `:warning` (can be overriden per method)
+*Default level:* `:warning` (can be overridden per method)
 
 *Config:*
 
@@ -1034,7 +1034,7 @@ See [issue](https://github.com/clj-kondo/clj-kondo/issues/1920).
 *Keyword:* `:destructured-or-binding-of-same-map`
 
 *Description:* an `:or` default value refers to a destructured binding of the
-same map. This may result in ambigious behavior since the order of bindings is
+same map. This may result in ambiguous behavior since the order of bindings is
 undefined. See [this](https://github.com/clj-kondo/clj-kondo/issues/916) issue
 for more details and discussion.
 
@@ -1554,7 +1554,7 @@ Read [this](https://github.com/clj-kondo/clj-kondo/issues/1331) issue for more b
 
 *Keyword:* `:not-empty?`
 
-*Description:* warn on `(not (empty? ...))` idiom. According to the docstring of `empty?` `seq` is prefered.
+*Description:* warn on `(not (empty? ...))` idiom. According to the docstring of `empty?` `seq` is preferred.
 
 *Default level:* `:warning`.
 

@@ -23,7 +23,7 @@ All issues are categorized in a column on the [project board](https://github.com
 
    1. Configuration should be able to live in a project's source repository, so team members can work out the style which they agree on for this project. Supporting external configuration leads to contradicting styles. By committing to a single project configuration team members also benefit from each other's work.
    2. Configuration spread across multiple files is harder to debug.
-   3. Single-file mode should be able to find the configuration it needs in a predicable location. Scattering configuration in metadata across libraries does not work well for this.
+   3. Single-file mode should be able to find the configuration it needs in a predictable location. Scattering configuration in metadata across libraries does not work well for this.
 
 
  6) Clj-kondo should be unobtrusive. Users of clj-kondo should not have to change their code only to make the linter happy. Team members who do not wish to use clj-kondo should not be confronted with clj-kondo-related annotations in their code.

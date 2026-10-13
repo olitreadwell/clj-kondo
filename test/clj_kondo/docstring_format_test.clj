@@ -32,7 +32,7 @@
              {:docstring-leading-trailing-whitespace {:level :warning}}}))
 
     (assert-submaps
-     ;; Dont't test row/col here; points to `def` expression instead of metadata map
+     ;; Don't test row/col here; points to `def` expression instead of metadata map
      '({:message "Docstring should not have leading or trailing whitespace."})
      (lint! "(def ^{:doc \" Some leading whitespace.\"} foo 1)"
             {:linters
@@ -56,7 +56,7 @@
              {:docstring-leading-trailing-whitespace {:level :warning}}}))
 
     (assert-submaps
-     ;; Dont't test row/col here; points to `defn` expression instead of metadata map
+     ;; Don't test row/col here; points to `defn` expression instead of metadata map
      '({:message "First line of the docstring should be a capitalized sentence ending with punctuation."})
      (lint! "(defn ^{:doc \"meta\"} foo [] 1)" no-summary)))
 
