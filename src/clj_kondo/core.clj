@@ -89,12 +89,12 @@
   In places where a file-like value is expected, either a path as string or a
   `java.io.File` may be passed, except for a classpath which must always be a string.
 
-  - `:parallel`: optional. A boolean indicating if sources should be linted in parallel.`
+  - `:parallel`: optional. A boolean indicating if sources should be linted in parallel.
 
-  - `:copy-configs`: optional. A boolean indicating if scanned hooks should be copied to clj-kondo config dir.`
+  - `:copy-configs`: optional. A boolean indicating if scanned hooks should be copied to clj-kondo config dir.
 
   - `:skip-lint`: optional. A boolean indicating if linting should be
-  skipped. Other tasks like copying configs will still be done if `:copy-configs` is true.`
+  skipped. Other tasks like copying configs will still be done if `:copy-configs` is true.
 
   - `:repro`: optional. Boolean indicating that the home dir config should be ignored.
 

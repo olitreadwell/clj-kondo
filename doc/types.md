@@ -46,8 +46,8 @@ $ clj-kondo --lint - <<< '(ns bar (:require [foo :refer [foo]])) (foo 1)'
 ```
 
 ``` clojure
-$ clj-kondo --lint - <<< '(ns bar (:require [foo :refer [foo]])) (inc (foo "foo"))
-<stdin>:1:45: warning: Expected: number, received: string.'
+$ clj-kondo --lint - <<< '(ns bar (:require [foo :refer [foo]])) (inc (foo "foo"))'
+<stdin>:1:45: warning: Expected: number, received: string.
 ```
 
 The configuration is organized per namespace. Annotations are provided per arity.

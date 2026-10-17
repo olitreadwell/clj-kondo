@@ -191,7 +191,7 @@
    expr))
 
 (defn scope-end
-  "Used within extract-bindings. Extracts the end postion of the
+  "Used within extract-bindings. Extracts the end position of the
    scoped-expr for the binding."
   [scoped-expr]
   (some-> scoped-expr
@@ -2517,7 +2517,7 @@
           ;; We have encountered a protocol or interface name, or a
           ;; record or type name (in the case of extend-protocol and
           ;; extend-type). We need to deal with extend-protocol in a
-          ;; special way, as there is a single protocol being extented
+          ;; special way, as there is a single protocol being extended
           ;; to multiple records/types.
           (do
             (when-not (and (identical? :cljs (:lang ctx))
@@ -4319,7 +4319,7 @@
                              ctx
                              (assoc ctx :quoted true))]
                    ;; we don't add a new arg types vector but just let the
-                   ;; single argument add its tag to the exising vector
+                   ;; single argument add its tag to the existing vector
                    (analyze-children ctx children false)))
         :syntax-quote (do
                         (lint-unused-value ctx expr)
