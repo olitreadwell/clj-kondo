@@ -23,7 +23,7 @@
 (deftest missing-body-in-when-valid-test
   (testing "test linting when with condition and body"
     (is (empty? (lint! "(when (> 1 0) (prn 1))"))))
-  (testing "test linting when with multiple expresion in body"
+  (testing "test linting when with multiple expressions in body"
     (is (empty? (lint! "(when true (prn 1) (+ 1 1))"))))
   (testing "test linting nested when"
     (is (empty? (lint! "(when (> 1 0) (when (prn 1) (+ 1 1)))")))))

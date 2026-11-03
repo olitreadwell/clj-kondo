@@ -1981,7 +1981,7 @@
       (is c-sub-id)
       (is d-sub-id)
       (is e-sub-id)
-      (testing "arrow style syntatic sugar references are tracked"
+      (testing "arrow style syntactic sugar references are tracked"
         (is (some #(when (and (= "a" (:name %))
                               (= b-sub-id (-> % :context :re-frame.core :in-id))
                               (some-> % :context :re-frame.core :subscription-ref)) %) keywords))

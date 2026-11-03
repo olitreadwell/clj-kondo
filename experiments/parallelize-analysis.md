@@ -1,4 +1,4 @@
-Clj-kondo tries to parallize its analysis based on the number of cores.
+Clj-kondo tries to parallelize its analysis based on the number of cores.
 When linting a big project like ~/dev/metabase, it currently takes 27s.
 
 ```
