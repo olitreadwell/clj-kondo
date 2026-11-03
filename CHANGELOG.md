@@ -7,19 +7,47 @@ For a list of breaking changes, check [here](#breaking-changes).
 <!-- Dev checklist: -->
 
 <!-- - [ ] fill in empty doc links in changelogs -->
+<!-- - [ ] bump ductile and clerk regression test shas to main HEAD -->
 <!-- - [ ] script/bump_version release -->
 <!-- - [ ] github release (publish the draft manually) -->
 <!-- - [ ] bb script/release-everything.clj -> homebrew, clj-kondo pod, clj-kondo-bb, lein-clj-kondo, post-release bump -->
 
-## Unreleased
+## 2026.10.26
 
-- `:type-mismatch`: `merge` and `merge-with` require a map or nil as first map argument. E.g. `(merge [1 2] [3 4])` will warn.
-- Catch up with new 1.13 destructuring.
-- [#2998](https://github.com/clj-kondo/clj-kondo/issues/2998): bump ASM to 9.10.1 to analyze Java 25 class files. An unreadable class file in a JAR no longer prevents analysis of the other entries ([@skylightis666](https://github.com/skylightis666)).
-- [#2996](https://github.com/clj-kondo/clj-kondo/issues/2996): native binary: Java member analysis no longer fails on a `.java` source file with an enum ([@skovati](https://github.com/skovati)).
-- Hooks: a qualified symbol in hook output resolves without a require in the calling namespace. E.g. a hook that returns `(my.library/foo ...)` now triggers the hook for `my.library/foo` without requiring `my.library`.
-- Bump graal-build-time to 1.0.6 to fix startup crash in binaries built with GraalVM 25.1+.
-- Bump edamame to 1.6.43: a function literal inside a syntax-quoted macro extracted with `:clj-kondo/macroexpand-hook` no longer fails with `unsupported binding form ns/%1`.
+- `:unknown-map-key`: fix false positive on a lookup on a var defined more than once. E.g. `(def x {:a 1}) (:a x) (def x {:b 1})` no longer warns.
+- [#3052](https://github.com/clj-kondo/clj-kondo/issues/3052): fix stack overflow in type checking of a recursive function that returns a keyword lookup on its own result.
+- [#3042](https://github.com/clj-kondo/clj-kondo/issues/3042): macros from source: fully qualify imported classes inside syntax-quote. E.g. `` `UUID `` with `(:import (java.util UUID))` no longer warns about an unresolved var or namespace at the call site.
+- [#3043](https://github.com/clj-kondo/clj-kondo/issues/3043): fix false positive unresolved var for a reference before `ns-unmap` of the same var. E.g. `(def a 1) (inc a) (ns-unmap *ns* 'a)` no longer warns.
+- [#3044](https://github.com/clj-kondo/clj-kondo/issues/3044): core.match: analyze map pattern keys as expressions. E.g. `(match [m] [{Integer/MAX_VALUE 1}] :yes)` no longer warns about an unsupported binding form.
+- [#3046](https://github.com/clj-kondo/clj-kondo/issues/3046): core.match: `_` in a pattern is a wildcard and does not use a local `_`. E.g. `(let [_ (setup!)] (match x [_] 1))` no longer warns about a used underscored binding.
+- [#3045](https://github.com/clj-kondo/clj-kondo/issues/3045): fix parse error for `:refer :all` in a namespace with a macroexpand hook macro.
+- [#3037](https://github.com/clj-kondo/clj-kondo/issues/3037): Clojure 1.13: the namespace of `:foo/keys` and `:foo/keys!` qualifies a simple keyword after `&`. E.g. `{:foo/keys! [& :quux]}` requires `:foo/quux`.
+- [#3036](https://github.com/clj-kondo/clj-kondo/issues/3036): Clojure 1.13: support the `:req!` map destructuring directive. E.g. `{:req! {a :x}}` binds `a` and requires `:x`.
+- [#3034](https://github.com/clj-kondo/clj-kondo/issues/3034): fix false positive for code after a single unquote in a nested syntax-quote. E.g. ``` ``~(let [~@x] 1) ``` no longer warns about an odd number of binding forms.
+
+## 2026.10.20
+
+- NEW linter `:unknown-map-key`: warn on a keyword lookup of a key not present in a map. E.g. `(:hots (opts))` will warn when `opts` returns `{:host "localhost"}`.
+- Catch up with Clojure 1.13.0-alpha9 destructuring
+- [#2942](https://github.com/clj-kondo/clj-kondo/issues/2942): Analysis: a keyword after `&` in 1.13 `:keys` destructuring is a plain keyword. E.g. `:foo` in `{:a/keys [& :foo]}`.
+- Type checker: a type predicate narrows the type of a local in `if-not`, `cond` and `and`. E.g. `(when (and (string? x) (pos? n)) (inc x))` will warn.
+- Type checker: `merge` and `merge-with` require a map or `nil` as first map argument. E.g. `(merge [1 2] [3 4])` will warn.
+- Type checker: a `:keys` arg spec checks each map of a union argument. E.g. `(g (if x {:id 1} {:id 2}))` will warn when `g` requires key `:id` to be a string.
+- Type checker: a keyword lookup on a map return that may be nil includes nil. E.g. `(inc (:a (f x)))` with `(defn f [x] (when x {:a "s"}))` will warn.
+- [#3002](https://github.com/clj-kondo/clj-kondo/issues/3002): fix `Condition always true` false positive for a `:keys` return spec with `:nilable true`
+- Type checker: fix `:type-mismatch` and `:constant-condition` false positives on maps from hook-generated code. E.g. `defenterprise` in metabase.
+- [#2774](https://github.com/clj-kondo/clj-kondo/issues/2774): `:warn-on-reflection` also warns on Java constructor calls. E.g. `(Date. x)` will warn.
+- [#2994](https://github.com/clj-kondo/clj-kondo/issues/2994): check arity of calls in protocol implementations and `clojure.test/is` against cached namespaces
+- [#2956](https://github.com/clj-kondo/clj-kondo/issues/2956): fix `:invalid-arity` false positive for `(map {})`
+- [#3005](https://github.com/clj-kondo/clj-kondo/issues/3005): fix unresolved symbol in a self-referencing `def` when `clojure.test` is referred with `:all`
+- [#2945](https://github.com/clj-kondo/clj-kondo/issues/2945): support `:order-by`, `:having` and `:timeout` in Datalevin and Datahike queries
+- [#2947](https://github.com/clj-kondo/clj-kondo/issues/2947): config merging keeps the highest `:min-clj-kondo-version` ([@arimu1](https://github.com/arimu1))
+- Hooks: a qualified symbol in hook output no longer needs a require in the calling namespace
+- [#3006](https://github.com/clj-kondo/clj-kondo/issues/3006), [#3014](https://github.com/clj-kondo/clj-kondo/issues/3014), [#3015](https://github.com/clj-kondo/clj-kondo/issues/3015), [#3016](https://github.com/clj-kondo/clj-kondo/issues/3016): fixes for hooks generated with `:clj-kondo/macroexpand-hook`: referred macros, helper namespaces, requires without alias and nested hooks ([@imrekoszo](https://github.com/imrekoszo))
+- [#2998](https://github.com/clj-kondo/clj-kondo/issues/2998): analyze Java 25 class files ([@skylightis666](https://github.com/skylightis666))
+- [#2996](https://github.com/clj-kondo/clj-kondo/issues/2996): fix Java member analysis of a `.java` file with an enum in the native binary ([@skovati](https://github.com/skovati))
+- [#2948](https://github.com/clj-kondo/clj-kondo/issues/2948): fix startup crash of binaries built with GraalVM 25.1+
+- Bump SCI to 0.15.59
 
 ## 2026.08.04
 

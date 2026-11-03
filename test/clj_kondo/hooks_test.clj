@@ -602,26 +602,27 @@ my-ns/special-map \"
   (let [cfg-dir (fs/file "corpus" "macro-from-source-xref" ".clj-kondo")
         helpers-gen (fs/file cfg-dir "clj_kondo" "gen_macros" "helpers.clj")
         main-gen (fs/file cfg-dir "clj_kondo" "gen_macros" "main.clj")
+        qualified-gen (fs/file cfg-dir "clj_kondo" "gen_macros" "qualified.clj")
         src-dir (fs/file "corpus" "macro-from-source-xref" "src")
         cleanup! (fn []
                    (fs/delete-tree (fs/file cfg-dir "clj_kondo"))
                    (fs/delete-tree (fs/file cfg-dir "inline-configs"))
                    (fs/delete-tree (fs/file cfg-dir ".cache")))]
     (cleanup!)
-    (testing "first run extracts both namespaces' marker forms"
-      (lint! src-dir
+    (testing "first run extracts both namespaces' marker forms and redirects
+    the consumer's alias to the helper's gen ns, also when the consumer is
+    linted first"
+      (lint! [(fs/file src-dir "main.clj") (fs/file src-dir "qualified.clj") (fs/file src-dir "helpers.clj")]
              {:linters {:unresolved-symbol {:level :error}}}
              "--config-dir" (str cfg-dir))
       (is (fs/exists? helpers-gen))
       (is (str/includes? (slurp (fs/file helpers-gen)) "(defn binding-vec?"))
-      (is (fs/exists? main-gen)))
-    (testing "second run redirects the consumer's alias to the helper's gen ns
-    (after the first run produced the helper gen file)"
-      (lint! src-dir
-             {:linters {:unresolved-symbol {:level :error}}}
-             "--config-dir" (str cfg-dir))
-      (let [gen (slurp (fs/file main-gen))]
-        (is (str/includes? gen "[clj-kondo.gen-macros.helpers :as h]"))))
+      (is (fs/exists? main-gen))
+      (is (str/includes? (slurp (fs/file main-gen))
+                         "[clj-kondo.gen-macros.helpers :as h]"))
+      (testing "for a namespace required without an alias"
+        (is (str/includes? (slurp (fs/file qualified-gen))
+                           "[clj-kondo.gen-macros.helpers :as helpers]"))))
     (testing "subsequent run lints clean - macro expands using the redirected helper"
       (assert-submaps2
        []
@@ -629,6 +630,89 @@ my-ns/special-map \"
               {:linters {:unresolved-symbol {:level :error}}}
               "--config-dir" (str cfg-dir))))
     (cleanup!)))
+
+(deftest macro-from-source-refer-test
+  (let [cfg-dir (fs/file "corpus" "macro-from-source-refer" ".clj-kondo")
+        gen-file (fs/file cfg-dir "clj_kondo" "gen_macros" "qualification.clj")
+        src-dir (fs/file "corpus" "macro-from-source-refer" "src")
+        cleanup! (fn []
+                   (fs/delete-tree (fs/file cfg-dir "clj_kondo"))
+                   (fs/delete-tree (fs/file cfg-dir "inline-configs"))
+                   (fs/delete-tree (fs/file cfg-dir ".cache")))]
+    (cleanup!)
+    (try
+      (lint! src-dir
+             {:linters {:unresolved-symbol {:level :error}
+                        :aliased-referred-var {:level :off}}}
+             "--config-dir" (str cfg-dir))
+      (let [gen (slurp gen-file)]
+        (testing "the gen ns refers the referred vars of the source ns, renames included"
+          (is (str/includes? gen "(refer 'clojure.string :only '[join])"))
+          (is (str/includes? gen "(refer 'clojure.test :only '[deftest] :rename '{deftest defcheck})")))
+        (testing "ordinary quoted symbols remain unchanged"
+          (is (str/includes? gen "'(quote join)"))))
+      (testing "generated hooks chain into analyze-call hooks with aliases and refers,
+      with or without requiring the underlying macro namespace at the call site"
+        (assert-submaps2
+         []
+         (lint! src-dir
+                {:linters {:unresolved-symbol {:level :error}
+                           :aliased-referred-var {:level :off}}}
+                "--config-dir" (str cfg-dir))))
+      (finally
+        (cleanup!)))))
+
+(deftest macro-from-source-refer-all-test
+  (let [cfg-dir (fs/create-temp-dir)]
+    (try
+      (doseq [libspec ["(:require [clojure.set :refer :all])" "(:use [clojure.set])"]]
+        (testing (str libspec " in a namespace with a macroexpand hook parses")
+          (is (empty? (filter #(str/includes? (:message %) "Can't parse")
+                              (lint! (str "(ns demo.refer-all " libspec ")
+(defmacro m {:clj-kondo/macroexpand-hook true} [x] `(inc ~x))")
+                                     "--cache" "false"
+                                     "--config-dir" (str cfg-dir)))))))
+      (finally
+        (fs/delete-tree cfg-dir)))))
+
+(deftest macro-from-source-import-test
+  (let [dir (fs/create-temp-dir)
+        cfg-dir (fs/file dir ".clj-kondo")
+        macros (fs/file dir "macros.clj")
+        top-level (fs/file dir "top_level.clj")
+        app (fs/file dir "app.clj")]
+    (try
+      (fs/create-dirs cfg-dir)
+      (spit macros "(ns macros (:import (java.util UUID)))
+(defmacro tag {:clj-kondo/macroexpand-hook true} [sym] `(def ~(vary-meta sym assoc :tag `UUID) nil))
+(defmacro check {:clj-kondo/macroexpand-hook true} [sym x] `(def ~sym (instance? UUID ~x)))
+(defmacro make {:clj-kondo/macroexpand-hook true} [sym] `(def ~sym [(UUID/randomUUID) (UUID. 1 2)]))
+(defmacro unquoted {:clj-kondo/macroexpand-hook true} [sym] `(def ~sym ~'UUID))
+(defmacro quoted {:clj-kondo/macroexpand-hook true} [sym] `(def ~sym 'UUID))
+(defmacro nested {:clj-kondo/macroexpand-hook true} [sym] `(def ~sym ~(list 'quote `UUID)))")
+      (spit top-level "(ns top-level)
+(import '(java.util UUID))
+(defmacro check {:clj-kondo/macroexpand-hook true} [sym x] `(def ~sym (instance? UUID ~x)))")
+      (spit app "(ns app (:require [macros] [top-level]))
+(macros/tag a) (macros/check b 1) (macros/make c) (top-level/check d 1)
+[a b c d]")
+      (clj-kondo/run! {:lint [(str macros) (str top-level)] :dependencies true :config-dir (str cfg-dir)})
+      (let [gen (slurp (fs/file cfg-dir "clj_kondo" "gen_macros" "macros.clj"))]
+        (testing "the gen ns fully qualifies syntax-quoted imported classes"
+          (is (str/includes? gen ":tag `java.util.UUID"))
+          (is (str/includes? gen "(instance? java.util.UUID ~x)"))
+          (is (str/includes? gen "[(java.util.UUID/randomUUID) (java.util.UUID. 1 2)]"))
+          (is (str/includes? gen "(def ~sym 'java.util.UUID)"))
+          (is (str/includes? gen "~(list 'quote `java.util.UUID)")))
+        (testing "the gen ns keeps an unquoted imported class unchanged"
+          (is (str/includes? gen "~'UUID"))))
+      (testing "the gen ns fully qualifies a class from a top-level import"
+        (is (str/includes? (slurp (fs/file cfg-dir "clj_kondo" "gen_macros" "top_level.clj"))
+                           "(instance? java.util.UUID ~x)")))
+      (testing "macro calls with syntax-quoted imported classes lint without findings"
+        (is (empty? (:findings (clj-kondo/run! {:lint [(str app)] :config-dir (str cfg-dir)})))))
+      (finally
+        (fs/delete-tree dir)))))
 
 (deftest hook-failure-surfaces-as-finding-test
   (testing "When a macroexpand hook fails (e.g. SCI can't resolve a symbol in
@@ -775,6 +859,22 @@ my-ns/special-map \"
        (lint! src-dir
               {:linters {:unresolved-symbol {:level :error}}}
               "--config-dir" (str cfg-dir))))
+    (cleanup!)))
+
+(deftest macro-from-source-nested-hook-test
+  (let [cfg-dir (fs/file "corpus" "macro-from-source-nested" ".clj-kondo")
+        src-dir (fs/file "corpus" "macro-from-source-nested" "src")
+        cleanup! (fn []
+                   (fs/delete-tree (fs/file cfg-dir "clj_kondo"))
+                   (fs/delete-tree (fs/file cfg-dir "inline-configs"))
+                   (fs/delete-tree (fs/file cfg-dir ".cache")))]
+    (cleanup!)
+    (lint! src-dir "--config-dir" (str cfg-dir))
+    (testing "a qualified symbol generated by an outer hook stays resolved
+    when an inner hook expands it, a user-written one does not"
+      (assert-submaps2
+       '({:file "corpus/macro-from-source-nested/src/app.clj", :row 8, :col 19, :level :warning, :message "Unresolved namespace h. Are you missing a require?"})
+       (lint! src-dir "--config-dir" (str cfg-dir))))
     (cleanup!)))
 
 (deftest stackoverflow-in-hook-result-test

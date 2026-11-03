@@ -730,7 +730,9 @@
                          {:linters {:type-mismatch {:level :error}}})))
       (is (empty? (lint! "(declare bar) (defn foo [] (bar)) (defn bar [] (foo))"
                          {:linters {:type-mismatch {:level :error}}}
-                         "--cache" "true"))))))
+                         "--cache" "true")))
+      (is (empty? (lint! "(defn walk [x] (let [base {:state :blocked}] (if x (let [r (walk (dec x))] (assoc base :state (:state r))) base))) (inc (:state (walk 1)))"
+                         {:linters {:type-mismatch {:level :error}}}))))))
 
 (deftest clojure-string-replace-test
   (assert-submaps2
@@ -1018,7 +1020,49 @@
 (do
   (defn fun4 [m] (:a m))
   (fun4 {}))"
-            config-2))))
+            config-2)))
+
+  (testing "a keyword lookup on a :nilable true map return includes nil"
+    (assert-submaps2
+     '({:row 3 :message "Expected: string, received: integer or nil."}
+       {:row 4 :message "Expected: string, received: integer or nil."}
+       {:row 5 :message "Expected: string, received: integer."})
+     (lint! "(ns a) (defn f [x] (when x {:id 1 :m {:k 1}})) (defn g [m] m)
+(ns b (:require [a]))
+(subs (:id (a/f 1)) 0)
+(subs (:k (:m (a/f 1))) 0)
+(a/g (a/f 1))"
+            (assoc-in config [:linters :type-mismatch :namespaces]
+                      '{a {f {:arities {1 {:ret {:op :keys
+                                                 :req {:id :int
+                                                       :m {:op :keys :req {:k :int}}}
+                                                 :nilable true}}}}
+                           g {:arities {1 {:args [{:op :keys :req {:id :string}}]}}}}}))))
+
+  (testing "a keyword lookup of an :opt or unlisted key on a :keys map return is not provably nil"
+    (assert-submaps2
+     '({:row 5 :message "Expected: number, received: string or nil."})
+     (lint! "(ns a) (defn f [] {:id 1 :name \"x\" :extra 2})
+(ns w (:require [a])) (defn g [] (a/f))
+(ns b (:require [w]))
+(if (:extra (w/g)) 1 2)
+(inc (:name (w/g)))"
+            (-> config
+                (assoc-in [:linters :constant-condition :level] :warning)
+                (assoc-in [:linters :type-mismatch :namespaces]
+                          '{a {f {:arities {0 {:ret {:op :keys
+                                                     :req {:id :int}
+                                                     :opt {:name :string}}}}}}})))))
+
+  (testing "a keyword lookup on an inferred nilable map return includes nil"
+    (assert-submaps2
+     '({:row 3 :message "Expected: string, received: nil or positive integer."}
+       {:row 4 :message "Expected: number, received: string or nil."})
+     (lint! "(ns a) (defn f [x] (when x {:a 1 :b {:c \"s\"}}))
+(ns b (:require [a]))
+(subs (:a (a/f 1)) 0)
+(inc (:c (:b (a/f 1))))"
+            config))))
 
 (deftest misc-false-positives-test
   (is (empty? (lint! "(even? ('a {'a 10}))" config)))
@@ -1888,6 +1932,81 @@
       (is (empty? (lint! "(defn f [x] (when (string? x) (subs x 1)))" config))))
     (testing "when-not does not narrow, its condition is negated"
       (is (empty? (lint! "(defn f [x] (when-not (string? x) (subs x 1)))" config))))))
+
+(deftest and-narrowing-test
+  (let [config {:linters {:type-mismatch {:level :error}}}]
+    (testing "value is narrowed in the args after the test"
+      (assert-submaps2
+       '({:row 1 :col 35 :message "Expected: number, received: string."})
+       (lint! "(defn f [x] (and (string? x) (inc x)))" config)))
+    (testing "narrowings accumulate over the args"
+      (assert-submaps2
+       '({:row 1 :col 57 :message "Expected: number, received: string."})
+       (lint! "(defn f [x y] (and (string? x) (int? y) (subs x y) (inc x)))" config)))
+    (testing "correct usage after the test is not flagged"
+      (is (empty? (lint! "(defn f [x] (and (string? x) (subs x 1)))" config))))
+    (testing "args before the test are not narrowed"
+      (is (empty? (lint! "(defn f [x] (and (inc x) (string? x)))" config))))
+    (testing "or does not narrow"
+      (is (empty? (lint! "(defn f [x] (or (string? x) (inc x)))" config))))
+    (testing "an and condition narrows the body of when"
+      (assert-submaps2
+       '({:row 1 :col 53 :message "Expected: number, received: string."})
+       (lint! "(defn f [x n] (when (and (string? x) (pos? n)) (inc x)))" config)))
+    (testing "an and condition narrows the then branch of if"
+      (assert-submaps2
+       '({:row 1 :col 51 :message "Expected: number, received: string."})
+       (lint! "(defn f [x n] (if (and (string? x) (pos? n)) (inc x) 0))" config)))
+    (testing "an and condition does not narrow the else branch"
+      (is (empty? (lint! "(defn f [x n] (if (and (string? x) (pos? n)) 0 (inc x)))" config))))
+    (testing "a nested and test narrows the args after it"
+      (assert-submaps2
+       '({:row 1 :col 45 :message "Expected: number, received: string."})
+       (filter (comp #{:error} :level)
+               (lint! "(defn f [x y] (and (and (string? x) y) (inc x)))" config))))
+    (testing "a shadowed and does not narrow"
+      (is (empty? (filter (comp #{:error} :level)
+                          (lint! "(ns a (:refer-clojure :exclude [and])) (defmacro and [& xs] xs)
+(defn f [x n] (when (and (string? x) (pos? n)) (inc x)))" config)))))))
+
+(deftest cond-narrowing-test
+  (let [config {:linters {:type-mismatch {:level :error}}}]
+    (testing "each test narrows the expr of its clause"
+      (assert-submaps2
+       '({:row 1 :col 36 :message "Expected: number, received: string."}
+         {:row 1 :col 54 :message "Expected: string, received: map."})
+       (lint! "(defn f [x] (cond (string? x) (inc x) (map? x) (subs x 1) :else x))" config)))
+    (testing "an and test narrows the expr of its clause"
+      (assert-submaps2
+       '({:row 1 :col 53 :message "Expected: number, received: string."})
+       (lint! "(defn f [x n] (cond (and (string? x) (pos? n)) (inc x) :else 0))" config)))
+    (testing "correct usage in each clause is not flagged"
+      (is (empty? (lint! "(defn f [x] (cond (string? x) (subs x 1) (number? x) (inc x) :else (inc x)))" config))))
+    (testing "a later test is not narrowed"
+      (is (empty? (lint! "(defn f [x] (cond (string? x) 1 (inc x) 2))" config))))
+    (testing "a shadowed cond does not narrow"
+      (is (empty? (filter (comp #{:error} :level)
+                          (lint! "(ns a (:refer-clojure :exclude [cond])) (defmacro cond [& xs] xs)
+(defn f [x] (cond (string? x) (inc x)))" config)))))))
+
+(deftest if-not-narrowing-test
+  (let [config {:linters {:type-mismatch {:level :error}}}]
+    (testing "the test narrows the else branch"
+      (assert-submaps2
+       '({:row 1 :col 40 :message "Expected: number, received: string."})
+       (lint! "(defn f [x] (if-not (string? x) 0 (inc x)))" config)))
+    (testing "an and test narrows the else branch"
+      (assert-submaps2
+       '({:row 1 :col 57 :message "Expected: number, received: string."})
+       (lint! "(defn f [x n] (if-not (and (string? x) (pos? n)) 0 (inc x)))" config)))
+    (testing "the then branch is not narrowed"
+      (is (empty? (lint! "(defn f [x] (if-not (string? x) (inc x) (subs x 1)))" config))))
+    (testing "the when-not body is not narrowed"
+      (is (empty? (lint! "(defn f [x] (when-not (string? x) (inc x)))" config))))
+    (testing "a shadowed if-not does not narrow"
+      (is (empty? (filter (comp #{:error} :level)
+                          (lint! "(ns a (:refer-clojure :exclude [if-not])) (defmacro if-not [& xs] xs)
+(defn f [x] (if-not (string? x) 0 (inc x)))" config)))))))
 
 (deftest nil-narrowing-test
   (let [config {:linters {:type-mismatch {:level :error}}}]

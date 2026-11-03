@@ -21,8 +21,8 @@
 (defn analyze-token [ctx expr]
   (let [sym (utils/symbol-from-token expr)]
     (cond
-      ;; & is rest pattern syntax, not a binding
-      (= '& sym) nil
+      ;; & and _ are pattern syntax, not bindings
+      (contains? '#{& _} sym) nil
       (and sym
            (not (contains? (:bindings ctx) sym)))
       (common/extract-bindings ctx expr)
@@ -44,6 +44,17 @@
                    (into* ctx bindings bnds))
             (recur (next children) bindings)))
         bindings))))
+
+(defn analyze-map [ctx expr]
+  (loop [children (seq (:children expr))
+         bindings {}]
+    (if children
+      (let [[k v & rchildren] children]
+        (common/analyze-expression** ctx k)
+        (if-let [bnds (some->> v (analyze-expr ctx))]
+          (recur rchildren (into* ctx bindings bnds))
+          (recur rchildren bindings)))
+      bindings)))
 
 (defn analyze-list [ctx expr]
   (let [children (:children expr)
@@ -88,7 +99,7 @@
       (:vector)
       (analyze-vector ctx expr)
       (:map)
-      (analyze-children ctx expr)
+      (analyze-map ctx expr)
       ;; default
       (do (common/analyze-expression** ctx expr)
           nil))))

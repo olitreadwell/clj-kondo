@@ -157,6 +157,20 @@
          "/"
          (->> name clojure.core/name str/lower-case))))
 
+(defn reg-temp-var!
+  "Registers `var-sym` in `ns-sym` as a temporary var so it resolves before
+  its def is registered.
+  Leaves a var that is already registered alone."
+  [{:keys [base-lang lang namespaces] :as ctx} ns-sym var-sym]
+  (when-not (:skip-reg-var ctx)
+    (let [path [base-lang lang ns-sym :vars]]
+      (when-not (contains? (get-in @namespaces path) var-sym)
+        (swap! namespaces update-in path
+               (fn [vars]
+                 (if (contains? vars var-sym)
+                   vars
+                   (assoc vars var-sym {:ns ns-sym :name var-sym :temp true}))))))))
+
 (defn reg-var!
   ([ctx ns-sym var-sym expr]
    (reg-var! ctx ns-sym var-sym expr nil))
@@ -212,13 +226,19 @@
                                  classfile (var-classfile metadata)
                                  hard-def? (and (not temp?)
                                                 (not (:declared metadata))
-                                                (not (:in-comment metadata)))]
+                                                (not (:in-comment metadata)))
+                                 redefined (and prev-var
+                                                (not (:declared metadata))
+                                                (or (:redefined prev-var)
+                                                    (and (not (:temp prev-var))
+                                                         (not (:declared prev-var)))))]
                              (-> ns
                                  (update :vars assoc
                                          var-sym
                                          ;; a comment form def doesn't overwrite a real def
                                          ;; but is kept under :comment-def for usages in comment forms
-                                         (if (and (:in-comment metadata)
+                                         (cond->
+                                          (if (and (:in-comment metadata)
                                                   prev-var
                                                   (not (:in-comment prev-var))
                                                   (not (:temp prev-var)))
@@ -233,7 +253,8 @@
                                                    (assoc new-var :comment-def (dissoc prev-var :comment-def))
                                                    (:comment-def prev-var)
                                                    (assoc new-var :comment-def (:comment-def prev-var))
-                                                   :else new-var))))
+                                                   :else new-var)))
+                                           redefined (assoc :redefined true)))
                                  (assoc :classfiles
                                         (if classfile
                                           (update classfiles classfile (fnil conj []) var-sym)
@@ -352,6 +373,8 @@
   [{:keys [base-lang lang namespaces] :as ctx} ns-sym required-ns-sym]
   (swap! namespaces update-in [base-lang lang ns-sym :used-namespaces]
          conj required-ns-sym)
+  ;; loads the namespace from the cache
+  (swap! (:used-namespaces ctx) update base-lang conj required-ns-sym)
   ;; Capture per-usage kind for the macros-from-source feature so the
   ;; generated hook file can decide between :as and :as-alias on the
   ;; same evidence the analyzer already collects.
@@ -765,6 +788,12 @@
        :unresolved? true
        :unresolved-ns ns-sym})))
 
+(defn- warn-reflection-on-interop [ctx call? expr]
+  (if call?
+    (findings/warn-reflection ctx expr)
+    (when-let [ctor-expr (:constructor-expr ctx)]
+      (findings/warn-reflection ctx ctor-expr))))
+
 (defn resolve-name
   [ctx call? ns-name name-sym expr]
   (let [lang (:lang ctx)
@@ -826,7 +855,7 @@
                                (when cljs?
                                  (find (:referred-globals ns) ns-sym)))]
                   (reg-used-import! ctx name-sym ns-name package class-name expr {:call call?})
-                  (when call? (findings/warn-reflection ctx expr))
+                  (warn-reflection-on-interop ctx call? expr)
                   {:interop? true
                    :ns (symbol (str package "." class-name))
                    :name (symbol (name name-sym))})
@@ -834,7 +863,7 @@
                   (if (and (not (one-of ns* ["clojure.core"]))
                            (class-name? ns*))
                     (do (java/reg-class-usage! ctx ns* (name name-sym) (meta expr) (meta name-sym) {:call call?})
-                        (when call? (findings/warn-reflection ctx expr))
+                        (warn-reflection-on-interop ctx call? expr)
                         {:interop? true
                          :ns ns-sym
                          :name (symbol (name name-sym))})
@@ -898,7 +927,7 @@
                                      (find (:referred-globals ns) fs))))
                              (find (:imports ns) name-sym)))]
               (reg-used-import! ctx name-sym ns-name package name-sym* expr {:call call?})
-              (when call? (findings/warn-reflection ctx expr))
+              (warn-reflection-on-interop ctx call? expr)
               {:ns package
                :interop? true
                :name name-sym*})
@@ -928,7 +957,7 @@
                       (if (and (not referred-all-ns)
                                (class-name? name-sym))
                         (do (java/reg-class-usage! ctx (str name-sym) nil (meta expr))
-                            (when call? (findings/warn-reflection ctx expr))
+                            (warn-reflection-on-interop ctx call? expr)
                             {:interop? true})
                         {:ns (or referred-all-ns :clj-kondo/unknown-namespace)
                          :name (or (::original-name ctx) name-sym)
