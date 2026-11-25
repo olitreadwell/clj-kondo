@@ -19,7 +19,9 @@ API functions for producing nodes:
 
 - `list-node`: produce a new list node from a seqable of nodes.
 - `vector-node`: produce a new vector node from a seqable of nodes.
-- `map-node`: produce a new map node from a seqable of nodes
+- `map-node`: produce a new map node from a seqable of nodes. Takes an options
+  map as a second argument. `{:closed true}` marks the node as containing every
+  key of the map, so missing required keys will be reported.
 - `keyword-node`: produce a new keyword. Use `(api/keyword-node :foo)` for a
   normal keyword and `(api/keyword-node :foo true)` to produce a node for
   `::foo`.
@@ -643,6 +645,25 @@ You can prevent that using:
 (defn my-print [{:keys [node]}]
   {:node (vary-meta (api/list-node (list* (api/token-node 'clojure.core/println) (rest (:children node))))
            assoc :clj-kondo/ignore [:discouraged-var])})
+```
+
+### Lint a node as if written in another language
+
+Put `:clj-kondo/lang` metadata on a node to lint it as `:cljs` or `:clj`.
+
+In an `:analyze-call` hook:
+
+``` clojure
+(defn client-fn [{:keys [node]}]
+  {:node (vary-meta (api/list-node (list* (api/token-node 'fn) (rest (:children node))))
+           assoc :clj-kondo/lang :cljs)})
+```
+
+In a `:macroexpand` hook:
+
+``` clojure
+(defmacro client-fn [args & body]
+  (with-meta `(fn ~args ~@body) {:clj-kondo/lang :cljs}))
 ```
 
 ### Performance
